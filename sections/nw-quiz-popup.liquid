@@ -1,0 +1,1453 @@
+{% comment %}
+  Nodus Works — Shopify quiz popup (tek dosya)
+
+  Kurulum:
+  1. Bu dosyayı temanızın sections/nw-quiz-popup.liquid yoluna koyun.
+  2. layout/theme.liquid içinde </body> etiketinden hemen önce ekleyin:
+     {% section 'nw-quiz-popup' %}
+  3. Tema düzenleyicide "Quiz popup" bölümünden soruları, kodu ve renkleri yönetin.
+  4. Aynı indirim kodunu Shopify yönetiminde İndirimler bölümünden oluşturun.
+
+  Sunucu uygulaması yoktur. E-posta, Shopify'ın kendi /contact müşteri kaydına gider.
+  Kod Liquid içinde olduğu için sayfa kaynağında görünebilir.
+{% endcomment %}
+
+{% liquid
+  assign lang = request.locale.iso_code | split: '-' | first | downcase
+  assign accent = section.settings.accent | default: '#111111'
+  assign accent_text = section.settings.accent_text | default: '#ffffff'
+  assign card_bg = section.settings.background | default: '#ffffff'
+  assign card_text = section.settings.text | default: '#1a1a1a'
+  assign radius = section.settings.radius | default: 18
+  assign code = section.settings.discount_code | strip
+  assign tag = section.settings.customer_tag | default: 'quiz' | strip
+  assign days = section.settings.code_days | default: 7
+  assign delay = section.settings.delay | default: 5
+  assign tab_label = section.settings.tab_label | default: 'QUIZ' | strip
+  assign root = routes.root_url
+  assign code_path = code | url_encode
+  if root == '/'
+    assign contact_path = '/contact'
+    assign discount_path = '/discount/' | append: code_path
+  else
+    assign contact_path = root | append: '/contact'
+    assign discount_path = root | append: '/discount/' | append: code_path
+  endif
+  if section.settings.redirect != blank
+    assign redirect_target = section.settings.redirect
+  else
+    assign redirect_target = routes.all_products_collection_url
+  endif
+
+  case lang
+    when 'en'
+      assign t_kicker = 'Answer every question correctly'
+      assign t_progress = 'Question {n} of {t}'
+      assign t_next = 'Continue'
+      assign t_back = 'Back'
+      assign t_retry = 'Start again'
+      assign t_wrong = 'That answer is not right. Start again to unlock the code.'
+      assign t_choose = 'Choose an answer to continue.'
+      assign t_email_label = 'Email address'
+      assign t_email_hint = 'Your address is saved to this store’s Shopify customer list. The code appears in this window.'
+      assign t_email_button = 'Show the discount code'
+      assign t_email_invalid = 'Enter a valid email address.'
+      assign t_email_error = 'We could not save your email just now. Please try again.'
+      assign t_email_sending = 'Sending…'
+      assign t_challenge = 'A security check interrupted the form. Refresh the page and try again.'
+      assign t_success = 'Your code is ready'
+      assign t_success_text = 'Paste it at checkout, or apply it with the link below.'
+      assign t_remember = 'You can open this code again from the QUIZ tab for ' | append: days | append: ' days.'
+      assign t_copy = 'Copy code'
+      assign t_copied = 'Copied'
+      assign t_apply = 'Apply discount'
+      assign t_close = 'Close'
+      assign t_already = 'This address is already subscribed. Your code is below.'
+      assign t_nocode = 'The discount code setting is empty.'
+    when 'de'
+      assign t_kicker = 'Beantworten Sie alle Fragen richtig'
+      assign t_progress = 'Frage {n} von {t}'
+      assign t_next = 'Weiter'
+      assign t_back = 'Zurück'
+      assign t_retry = 'Von vorn'
+      assign t_wrong = 'Diese Antwort ist nicht richtig. Starten Sie erneut, um den Code zu öffnen.'
+      assign t_choose = 'Wählen Sie eine Antwort, um fortzufahren.'
+      assign t_email_label = 'E-Mail-Adresse'
+      assign t_email_hint = 'Ihre Adresse wird in der Shopify-Kundenliste dieses Shops gespeichert. Der Code erscheint in diesem Fenster.'
+      assign t_email_button = 'Rabattcode anzeigen'
+      assign t_email_invalid = 'Geben Sie eine gültige E-Mail-Adresse ein.'
+      assign t_email_error = 'Die E-Mail konnte gerade nicht gespeichert werden. Bitte versuchen Sie es erneut.'
+      assign t_email_sending = 'Wird gesendet…'
+      assign t_challenge = 'Eine Sicherheitsprüfung hat das Formular unterbrochen. Laden Sie die Seite neu.'
+      assign t_success = 'Ihr Code ist bereit'
+      assign t_success_text = 'Fügen Sie ihn an der Kasse ein oder wenden Sie ihn über den Link an.'
+      assign t_remember = 'Sie können den Code ' | append: days | append: ' Tage lang über den QUIZ-Tab erneut öffnen.'
+      assign t_copy = 'Code kopieren'
+      assign t_copied = 'Kopiert'
+      assign t_apply = 'Rabatt anwenden'
+      assign t_close = 'Schließen'
+      assign t_already = 'Diese Adresse ist bereits eingetragen. Ihr Code steht unten.'
+      assign t_nocode = 'Die Rabattcode-Einstellung ist leer.'
+    else
+      assign lang = 'tr'
+      assign t_kicker = 'Tüm soruları doğru bilin'
+      assign t_progress = 'Soru {n} / {t}'
+      assign t_next = 'Devam'
+      assign t_back = 'Geri'
+      assign t_retry = 'Baştan başla'
+      assign t_wrong = 'Bu cevap doğru değil. Kodu açmak için soruları baştan çözün.'
+      assign t_choose = 'Devam etmek için bir seçenek seçin.'
+      assign t_email_label = 'E-posta adresiniz'
+      assign t_email_hint = 'Adresiniz bu mağazanın Shopify müşteri listesine kaydedilir. Kod bu pencerede görünür.'
+      assign t_email_button = 'İndirim kodunu göster'
+      assign t_email_invalid = 'Geçerli bir e-posta adresi yazın.'
+      assign t_email_error = 'E-posta şu an kaydedilemedi. Biraz sonra tekrar deneyin.'
+      assign t_email_sending = 'Gönderiliyor…'
+      assign t_challenge = 'Güvenlik doğrulaması formu kesti. Sayfayı yenileyip tekrar deneyin.'
+      assign t_success = 'Kodunuz hazır'
+      assign t_success_text = 'Ödeme sırasında bu kodu yapıştırın ya da aşağıdaki bağlantıyla sepete işleyin.'
+      assign t_remember = 'Bu kodu ' | append: days | append: ' gün boyunca QUIZ sekmesinden yeniden açabilirsiniz.'
+      assign t_copy = 'Kodu kopyala'
+      assign t_copied = 'Kopyalandı'
+      assign t_apply = 'İndirimi uygula'
+      assign t_close = 'Kapat'
+      assign t_already = 'Bu adres zaten kayıtlı. Kodunuz aşağıda.'
+      assign t_nocode = 'İndirim kodu ayarı boş. Tema düzenleyiciden kodu yazın.'
+  endcase
+
+  if section.settings.kicker != blank
+    assign t_kicker = section.settings.kicker
+  endif
+  if section.settings.email_hint != blank
+    assign t_email_hint = section.settings.email_hint
+  endif
+  if section.settings.success_text != blank
+    assign t_success_text = section.settings.success_text
+  endif
+  unless section.settings.launcher
+    case lang
+      when 'en'
+        assign t_remember = 'Copy the code now. It stays available in this window for ' | append: days | append: ' days if the quiz opens again.'
+      when 'de'
+        assign t_remember = 'Kopieren Sie den Code jetzt. Er bleibt ' | append: days | append: ' Tage lang in diesem Fenster verfügbar.'
+      else
+        assign t_remember = 'Kodu şimdi kaydedin. Quiz yeniden açılırsa bu pencerede ' | append: days | append: ' gün boyunca görünür.'
+    endcase
+  endunless
+
+  assign active_count = 0
+  for block in section.blocks
+    if block.type == 'question' and block.settings.title != blank
+      assign block_locale = block.settings.locale | default: 'all'
+      if request.design_mode or block_locale == 'all' or block_locale == blank or block_locale == lang
+        assign active_count = active_count | plus: 1
+      endif
+    endif
+  endfor
+%}
+
+{% if section.settings.enabled and request.page_type != 'password' and request.page_type != 'gift_card' %}
+  <style data-nw-quiz>
+    #NwQuiz-{{ section.id }} {
+      --nw-accent: {{ accent }};
+      --nw-accent-text: {{ accent_text }};
+      --nw-bg: {{ card_bg }};
+      --nw-text: {{ card_text }};
+      --nw-radius: {{ radius }}px;
+    }
+
+    .nw-quiz-section {
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+    }
+
+    .nw-quiz-section--parked { display: none !important; }
+
+    #NwQuiz-{{ section.id }},
+    #NwQuiz-{{ section.id }} * {
+      box-sizing: border-box;
+    }
+
+    #NwQuiz-{{ section.id }} button,
+    #NwQuiz-{{ section.id }} input {
+      font: inherit;
+    }
+
+    #NwQuiz-{{ section.id }} [hidden] {
+      display: none !important;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__launcher {
+      position: fixed;
+      z-index: 99990;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      letter-spacing: 0.08em;
+      margin: 0;
+      border: 0;
+      border-radius: 0 14px 14px 0;
+      padding: 16px 11px;
+      min-height: 44px;
+      background: var(--nw-accent);
+      color: var(--nw-accent-text);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+      cursor: pointer;
+    }
+
+    #NwQuiz-{{ section.id }}.nw-quiz--right .nw-quiz__launcher {
+      left: auto;
+      right: 0;
+      border-radius: 14px 0 0 14px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__launcher:focus-visible {
+      outline: 2px solid var(--nw-accent);
+      outline-offset: 3px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000000;
+      display: grid;
+      place-items: end center;
+      padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      background: rgba(17, 17, 17, 0.48);
+      overscroll-behavior: contain;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__overlay[hidden] { display: none !important; }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__dialog {
+      width: min(440px, 100%);
+      max-height: min(92dvh, 760px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px 18px 16px;
+      background: var(--nw-bg);
+      color: var(--nw-text);
+      border-radius: var(--nw-radius) var(--nw-radius) 0 0;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__kicker {
+      margin: 6px 0 0;
+      font-size: 1.28rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__close {
+      width: 44px;
+      height: 44px;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--nw-text) 8%, transparent);
+      color: inherit;
+      cursor: pointer;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__close:focus-visible,
+    #NwQuiz-{{ section.id }} .nw-quiz__primary:focus-visible,
+    #NwQuiz-{{ section.id }} .nw-quiz__ghost:focus-visible,
+    #NwQuiz-{{ section.id }} .nw-quiz__back:focus-visible,
+    #NwQuiz-{{ section.id }} .nw-quiz__email input:focus-visible {
+      outline: 2px solid var(--nw-accent);
+      outline-offset: 2px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__progress {
+      margin: 0;
+      font-size: 0.82rem;
+      letter-spacing: 0.02em;
+      opacity: 0.72;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__bar {
+      height: 3px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--nw-text) 12%, transparent);
+      overflow: hidden;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__bar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--nw-accent);
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__q {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      min-inline-size: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__q legend {
+      padding: 0;
+      margin-bottom: 4px;
+      font-size: 1.02rem;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__locale {
+      margin: 0;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__opt {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 0;
+      padding: 12px 14px;
+      border: 1px solid color-mix(in srgb, var(--nw-text) 16%, transparent);
+      border-radius: 12px;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__opt:has(input:checked) {
+      border-color: var(--nw-accent);
+      background: color-mix(in srgb, var(--nw-accent) 8%, var(--nw-bg));
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__opt:has(input:focus-visible) {
+      outline: 2px solid var(--nw-accent);
+      outline-offset: 2px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__opt.is-wrong {
+      border-color: #8a2b2b;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__opt input {
+      width: 1.05rem;
+      height: 1.05rem;
+      margin: 0.15rem 0 0;
+      accent-color: var(--nw-accent);
+      flex: none;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__msg {
+      margin: 0;
+      color: #8a2b2b;
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__msg.is-note {
+      color: inherit;
+      opacity: 0.8;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__msg:empty { display: none; }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__email,
+    #NwQuiz-{{ section.id }} .nw-quiz__success {
+      display: grid;
+      gap: 10px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__email label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.92rem;
+      font-weight: 650;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__email input {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--nw-text) 22%, transparent);
+      background: color-mix(in srgb, var(--nw-text) 4%, var(--nw-bg));
+      color: var(--nw-text);
+      font-size: 16px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__hint,
+    #NwQuiz-{{ section.id }} .nw-quiz__remember {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      opacity: 0.8;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__code {
+      margin: 4px 0 0;
+      padding: 14px 12px;
+      border: 1px dashed color-mix(in srgb, var(--nw-text) 32%, transparent);
+      border-radius: 12px;
+      text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.35rem;
+      letter-spacing: 0.06em;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__footer {
+      display: grid;
+      gap: 8px;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__primary,
+    #NwQuiz-{{ section.id }} .nw-quiz__ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 999px;
+      font-weight: 650;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__primary {
+      border: 0;
+      background: var(--nw-accent);
+      color: var(--nw-accent-text);
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__primary:disabled {
+      opacity: 0.65;
+      cursor: progress;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__ghost,
+    #NwQuiz-{{ section.id }} .nw-quiz__back {
+      border: 1px solid color-mix(in srgb, var(--nw-text) 18%, transparent);
+      background: transparent;
+      color: inherit;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__back {
+      min-height: 40px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    #NwQuiz-{{ section.id }} .nw-quiz__hp {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    @media (min-width: 750px) {
+      #NwQuiz-{{ section.id }} .nw-quiz__overlay {
+        place-items: center;
+        padding: 24px;
+      }
+
+      #NwQuiz-{{ section.id }} .nw-quiz__dialog {
+        border-radius: var(--nw-radius);
+        max-height: min(86dvh, 760px);
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      #NwQuiz-{{ section.id }} .nw-quiz__bar > span {
+        transition: width 0.2s ease;
+      }
+
+      #NwQuiz-{{ section.id }} .nw-quiz__dialog {
+        animation: nwQuizIn-{{ section.id }} 0.22s ease;
+      }
+
+      @keyframes nwQuizIn-{{ section.id }} {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: none; }
+      }
+    }
+  </style>
+
+  <div
+    class="nw-quiz{% if section.settings.launcher_side == 'right' %} nw-quiz--right{% endif %}"
+    id="NwQuiz-{{ section.id }}"
+    data-section-id="{{ section.id }}"
+    data-domain="{{ shop.permanent_domain | escape }}"
+    data-delay="{{ delay }}"
+    data-frequency="{{ section.settings.frequency }}"
+    data-auto="{% if section.settings.auto_open %}true{% else %}false{% endif %}"
+    data-shuffle="{% if section.settings.shuffle %}true{% else %}false{% endif %}"
+    data-email="{% if section.settings.require_email %}true{% else %}false{% endif %}"
+    data-days="{{ days }}"
+    data-contact="{{ contact_path | escape }}"
+    data-tag="{{ tag | escape }}"
+    data-code="{{ code | escape }}"
+    data-apply-url="{{ discount_path | escape }}?redirect={{ redirect_target | url_encode }}"
+    data-launcher="{% if section.settings.launcher %}true{% else %}false{% endif %}"
+    lang="{{ lang }}"
+  >
+    <button
+      class="nw-quiz__launcher"
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      aria-controls="NwQuizDialog-{{ section.id }}"
+      {% unless section.settings.launcher %}hidden{% endunless %}
+    >{{ tab_label | escape }}</button>
+
+    <div class="nw-quiz__overlay" hidden>
+      <div
+        class="nw-quiz__dialog"
+        id="NwQuizDialog-{{ section.id }}"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="NwQuizTitle-{{ section.id }}"
+        tabindex="-1"
+      >
+        <div class="nw-quiz__head">
+          <p class="nw-quiz__kicker" id="NwQuizTitle-{{ section.id }}">{{ t_kicker | escape }}</p>
+          <button class="nw-quiz__close" type="button" aria-label="{{ t_close | escape }}">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M3 3l10 10M13 3L3 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="nw-quiz__progress" aria-live="polite"></p>
+        <div class="nw-quiz__bar" aria-hidden="true"><span></span></div>
+
+        <div class="nw-quiz__questions">
+          {% if active_count > 0 %}
+            {% for block in section.blocks %}
+              {% if block.type == 'question' and block.settings.title != blank %}
+                {% assign block_locale = block.settings.locale | default: 'all' %}
+                {% assign question_active = false %}
+                {% if request.design_mode or block_locale == 'all' or block_locale == blank or block_locale == lang %}
+                  {% assign question_active = true %}
+                {% endif %}
+                {% if question_active %}
+                  <fieldset class="nw-quiz__q" hidden data-correct="{{ block.settings.correct }}" data-block-id="{{ block.id }}" {{ block.shopify_attributes }}>
+                    <legend>{{ block.settings.title | escape }}</legend>
+                    {% if request.design_mode %}
+                      <p class="nw-quiz__locale">{{ block_locale | escape }}</p>
+                    {% endif %}
+                    {% assign raw_opts = block.settings.option_1 | append: '%%NW%%' | append: block.settings.option_2 | append: '%%NW%%' | append: block.settings.option_3 | append: '%%NW%%' | append: block.settings.option_4 %}
+                    {% assign opts = raw_opts | split: '%%NW%%' %}
+                    {% for opt in opts %}
+                      {% assign label = opt | strip %}
+                      {% if label != blank %}
+                        <label class="nw-quiz__opt">
+                          <input type="radio" name="nwq-{{ section.id }}-{{ block.id }}" value="{{ forloop.index }}">
+                          <span>{{ label | escape }}</span>
+                        </label>
+                      {% endif %}
+                    {% endfor %}
+                  </fieldset>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            {% if lang == 'en' %}
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>Where do you apply a discount code?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="1"><span>Under the product photos</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="2"><span>In the cart code field or at checkout</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="3"><span>In the store search</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="4"><span>Only on the paper receipt</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="1">
+                <legend>What does a working code require?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="1"><span>A discount created in the Shopify admin</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="2"><span>An empty cart</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="3"><span>A product title that matches the code</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="4"><span>A code made only of numbers</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>Where does the code appear when you finish?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="1"><span>Only in your email inbox</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="2"><span>In this same window</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="3"><span>Only in a delivery text</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="4"><span>Inside product reviews</span></label>
+              </fieldset>
+            {% elsif lang == 'de' %}
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>Wo lösen Sie einen Rabattcode ein?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="1"><span>Unter den Produktfotos</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="2"><span>Im Codefeld des Warenkorbs oder an der Kasse</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="3"><span>In der Shop-Suche</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="4"><span>Nur auf dem Kassenbon</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="1">
+                <legend>Was braucht ein gültiger Code?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="1"><span>Einen im Shopify-Admin angelegten Rabatt</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="2"><span>Einen leeren Warenkorb</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="3"><span>Einen Produktnamen, der dem Code entspricht</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="4"><span>Einen Code nur aus Zahlen</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>Wo erscheint der Code am Ende?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="1"><span>Nur im E-Mail-Postfach</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="2"><span>In diesem Fenster</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="3"><span>Nur in einer Liefer-SMS</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="4"><span>In den Produktbewertungen</span></label>
+              </fieldset>
+            {% else %}
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>İndirim kodunu alışverişe nerede eklersiniz?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="1"><span>Ürün görsellerinin altında</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="2"><span>Sepetteki kod alanına veya ödeme sayfasına</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="3"><span>Site aramasına</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-1" value="4"><span>Yalnızca kasa fişinde</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="1">
+                <legend>Kodun işe yaraması için hangisi gerekir?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="1"><span>Kodun Shopify yönetiminde oluşturulmuş bir indirim olması</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="2"><span>Sepetin boş olması</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="3"><span>Ürün adının kodla aynı olması</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-2" value="4"><span>Kodun yalnızca rakamlardan oluşması</span></label>
+              </fieldset>
+              <fieldset class="nw-quiz__q" hidden data-correct="2">
+                <legend>Quiz bitince indirim kodu nerede görünür?</legend>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="1"><span>Yalnızca e-posta kutusunda</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="2"><span>Aynı pencerede</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="3"><span>Yalnızca kargo mesajında</span></label>
+                <label class="nw-quiz__opt"><input type="radio" name="nwq-{{ section.id }}-3" value="4"><span>Ürün yorumlarının içinde</span></label>
+              </fieldset>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="nw-quiz__email" hidden>
+          <label>
+            {{ t_email_label | escape }}
+            <input type="email" inputmode="email" autocomplete="email" required>
+          </label>
+          <p class="nw-quiz__hint">{{ t_email_hint | escape }}</p>
+          <div class="nw-quiz__hp" aria-hidden="true">
+            <label>Company <input type="text" tabindex="-1" autocomplete="off"></label>
+          </div>
+        </div>
+
+        <div class="nw-quiz__success" hidden>
+          <p class="nw-quiz__hint" data-success-text>{{ t_success_text | escape }}</p>
+          <p class="nw-quiz__code" translate="no"></p>
+          <div class="nw-quiz__actions">
+            <button class="nw-quiz__ghost" type="button" data-copy>{{ t_copy | escape }}</button>
+            <a class="nw-quiz__primary" data-apply href="{{ discount_path | escape }}?redirect={{ redirect_target | url_encode }}">{{ t_apply | escape }}</a>
+          </div>
+          <p class="nw-quiz__remember">{{ t_remember | escape }}</p>
+        </div>
+
+        <p class="nw-quiz__msg" aria-live="polite"></p>
+        <div class="nw-quiz__footer">
+          <button class="nw-quiz__back" type="button" hidden>{{ t_back | escape }}</button>
+          <button class="nw-quiz__primary" type="button" data-next>{{ t_next | escape }}</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="application/json" id="NwQuizI18n-{{ section.id }}">
+      {
+        "kicker": {{ t_kicker | json }},
+        "progress": {{ t_progress | json }},
+        "next": {{ t_next | json }},
+        "back": {{ t_back | json }},
+        "retry": {{ t_retry | json }},
+        "wrong": {{ t_wrong | json }},
+        "choose": {{ t_choose | json }},
+        "emailButton": {{ t_email_button | json }},
+        "emailInvalid": {{ t_email_invalid | json }},
+        "emailError": {{ t_email_error | json }},
+        "emailSending": {{ t_email_sending | json }},
+        "challenge": {{ t_challenge | json }},
+        "success": {{ t_success | json }},
+        "copy": {{ t_copy | json }},
+        "copied": {{ t_copied | json }},
+        "close": {{ t_close | json }},
+        "already": {{ t_already | json }},
+        "nocode": {{ t_nocode | json }}
+      }
+    </script>
+    <script>
+      (function () {
+        'use strict';
+        var root = document.getElementById('NwQuiz-{{ section.id }}');
+        if (!root || root.dataset.booted === '1') return;
+        if (document.querySelector('.nw-quiz.is-ready')) {
+          var extra = root.closest('.shopify-section');
+          root.remove();
+          if (extra) extra.classList.add('nw-quiz-section--parked');
+          return;
+        }
+        root.dataset.booted = '1';
+        root.classList.add('is-ready');
+
+        var sectionId = root.dataset.sectionId;
+        var design = !!(window.Shopify && window.Shopify.designMode);
+        var sectionEl = root.closest('.shopify-section') || document.getElementById('shopify-section-' + sectionId);
+        if (!design && sectionEl) {
+          var style = sectionEl.querySelector('style[data-nw-quiz]');
+          var styleId = 'nw-quiz-style-' + sectionId;
+          if (style && !document.getElementById(styleId)) {
+            style.id = styleId;
+            document.head.appendChild(style);
+          }
+          document.body.appendChild(root);
+          sectionEl.classList.add('nw-quiz-section--parked');
+        }
+
+        var i18nNode = document.getElementById('NwQuizI18n-' + sectionId);
+        var t = {};
+        try { t = JSON.parse(i18nNode.textContent); } catch (error) { t = {}; }
+
+        var overlay = root.querySelector('.nw-quiz__overlay');
+        var dialog = root.querySelector('.nw-quiz__dialog');
+        var launcher = root.querySelector('.nw-quiz__launcher');
+        var kicker = root.querySelector('.nw-quiz__kicker');
+        var progress = root.querySelector('.nw-quiz__progress');
+        var bar = root.querySelector('.nw-quiz__bar > span');
+        var barWrap = root.querySelector('.nw-quiz__bar');
+        var emailBox = root.querySelector('.nw-quiz__email');
+        var emailInput = emailBox.querySelector('input[type="email"]');
+        var honey = emailBox.querySelector('.nw-quiz__hp input');
+        var successBox = root.querySelector('.nw-quiz__success');
+        var codeBox = root.querySelector('.nw-quiz__code');
+        var copyBtn = root.querySelector('[data-copy]');
+        var msg = root.querySelector('.nw-quiz__msg');
+        var footer = root.querySelector('.nw-quiz__footer');
+        var backBtn = root.querySelector('.nw-quiz__back');
+        var nextBtn = root.querySelector('[data-next]');
+        var closeBtn = root.querySelector('.nw-quiz__close');
+        var questions = Array.prototype.slice.call(root.querySelectorAll('.nw-quiz__q')).filter(function (q) {
+          return q.querySelector('input[type="radio"]');
+        });
+
+        if (!questions.length) return;
+
+        var index = 0;
+        var step = 'question';
+        var failed = false;
+        var sending = false;
+        var prepared = false;
+        var wonKey = 'nwQuiz:' + (root.dataset.domain || 'shop') + ':won';
+        var dismissKey = 'nwQuiz:' + (root.dataset.domain || 'shop') + ':dismiss';
+        var scrollPrev = null;
+        var timer = 0;
+        var lastFocus = null;
+
+        function readStore(area, key) {
+          try { return window[area].getItem(key); } catch (error) { return null; }
+        }
+        function writeStore(area, key, value) {
+          try { window[area].setItem(key, value); } catch (error) {}
+        }
+        function dropStore(area, key) {
+          try { window[area].removeItem(key); } catch (error) {}
+        }
+
+        function wonAt() {
+          var stamp = Number(readStore('localStorage', wonKey) || 0);
+          var days = Number(root.dataset.days || 7);
+          if (!stamp) return 0;
+          if (Date.now() - stamp > days * 86400000) {
+            dropStore('localStorage', wonKey);
+            return 0;
+          }
+          return stamp;
+        }
+
+        function shuffleQuestion(question) {
+          var options = Array.prototype.slice.call(question.querySelectorAll('.nw-quiz__opt'));
+          for (var i = options.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var swap = options[i];
+            options[i] = options[j];
+            options[j] = swap;
+          }
+          options.forEach(function (option) { question.appendChild(option); });
+        }
+
+        function shuffleAll() {
+          if (root.dataset.shuffle !== 'true' || design) return;
+          questions.forEach(shuffleQuestion);
+        }
+
+        function resetAnswers() {
+          questions.forEach(function (question) {
+            question.querySelectorAll('input').forEach(function (input) { input.checked = false; });
+            question.querySelectorAll('.is-wrong').forEach(function (node) { node.classList.remove('is-wrong'); });
+          });
+        }
+
+        function setMessage(text, tone) {
+          msg.textContent = text || '';
+          msg.classList.toggle('is-note', tone === 'note');
+        }
+
+        function render() {
+          questions.forEach(function (question) { question.hidden = true; });
+          emailBox.hidden = step !== 'email';
+          successBox.hidden = step !== 'success';
+          footer.hidden = step === 'success';
+          barWrap.hidden = step === 'success';
+          backBtn.hidden = true;
+          nextBtn.disabled = sending;
+          setMessage('');
+
+          if (step === 'question') {
+            var question = questions[index];
+            question.hidden = false;
+            kicker.textContent = t.kicker || '';
+            progress.hidden = false;
+            progress.textContent = (t.progress || '{n}/{t}').replace('{n}', String(index + 1)).replace('{t}', String(questions.length));
+            bar.style.width = ((index + 1) / questions.length * 100) + '%';
+            if (failed) {
+              nextBtn.textContent = t.retry || 'Start again';
+              setMessage(t.wrong || '');
+            } else {
+              nextBtn.textContent = t.next || 'Continue';
+              backBtn.hidden = index === 0;
+            }
+            return;
+          }
+
+          if (step === 'email') {
+            kicker.textContent = t.kicker || '';
+            progress.hidden = false;
+            progress.textContent = (t.progress || '').replace('{n}', String(questions.length)).replace('{t}', String(questions.length));
+            bar.style.width = '100%';
+            nextBtn.textContent = sending ? (t.emailSending || '…') : (t.emailButton || 'Show');
+            backBtn.hidden = false;
+            return;
+          }
+
+          kicker.textContent = t.success || '';
+          progress.hidden = true;
+          var code = root.dataset.code || '';
+          codeBox.textContent = code || (t.nocode || '');
+          copyBtn.textContent = t.copy || '';
+          copyBtn.hidden = !code;
+          var apply = root.querySelector('[data-apply]');
+          if (apply) apply.hidden = !code;
+        }
+
+        function lockScroll() {
+          if (design || scrollPrev) return;
+          var gap = window.innerWidth - document.documentElement.clientWidth;
+          scrollPrev = {
+            position: document.body.style.position,
+            top: document.body.style.top,
+            left: document.body.style.left,
+            right: document.body.style.right,
+            paddingRight: document.body.style.paddingRight,
+            y: window.scrollY || 0
+          };
+          document.body.style.position = 'fixed';
+          document.body.style.top = '-' + scrollPrev.y + 'px';
+          document.body.style.left = '0';
+          document.body.style.right = '0';
+          document.body.style.paddingRight = gap ? gap + 'px' : '';
+        }
+
+        function unlockScroll() {
+          if (!scrollPrev) return;
+          document.body.style.position = scrollPrev.position;
+          document.body.style.top = scrollPrev.top;
+          document.body.style.left = scrollPrev.left;
+          document.body.style.right = scrollPrev.right;
+          document.body.style.paddingRight = scrollPrev.paddingRight;
+          var y = scrollPrev.y;
+          scrollPrev = null;
+          window.scrollTo(0, y);
+        }
+
+        function openQuiz() {
+          if (!overlay.hidden) return;
+          lastFocus = document.activeElement;
+          if (!design && wonAt()) {
+            step = 'success';
+          } else if (!prepared) {
+            index = 0;
+            failed = false;
+            step = 'question';
+            resetAnswers();
+            shuffleAll();
+            prepared = true;
+          }
+          render();
+          overlay.hidden = false;
+          launcher.setAttribute('aria-expanded', 'true');
+          if (root.dataset.launcher === 'true') launcher.hidden = true;
+          lockScroll();
+          window.setTimeout(function () { closeBtn.focus(); }, 20);
+        }
+
+        function closeQuiz() {
+          if (overlay.hidden) return;
+          overlay.hidden = true;
+          launcher.setAttribute('aria-expanded', 'false');
+          if (root.dataset.launcher === 'true') launcher.hidden = false;
+          unlockScroll();
+          if (!design && !wonAt()) {
+            var frequency = root.dataset.frequency || 'session';
+            if (frequency === 'once') writeStore('localStorage', dismissKey, '1');
+            if (frequency === 'session') writeStore('sessionStorage', dismissKey, '1');
+          }
+          if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+        }
+
+        function finish() {
+          if (!design) writeStore('localStorage', wonKey, String(Date.now()));
+          step = 'success';
+          sending = false;
+          render();
+          if (copyBtn && !copyBtn.hidden) copyBtn.focus();
+        }
+
+        function submitEmail() {
+          if (sending) return;
+          if (honey && honey.value) {
+            setMessage(t.emailError || '');
+            return;
+          }
+          var email = (emailInput.value || '').trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setMessage(t.emailInvalid || '');
+            emailInput.focus();
+            return;
+          }
+          sending = true;
+          render();
+          var params = new URLSearchParams();
+          params.set('form_type', 'customer');
+          params.set('utf8', '✓');
+          params.set('contact[email]', email);
+          params.set('contact[tags]', root.dataset.tag || 'quiz');
+          params.set('contact[accepts_marketing]', 'true');
+          var controller = new AbortController();
+          var timeout = window.setTimeout(function () { controller.abort(); }, 12000);
+          fetch(root.dataset.contact || '/contact', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json'
+            },
+            body: params.toString(),
+            credentials: 'same-origin',
+            signal: controller.signal
+          }).then(function (response) {
+            return response.text().then(function (text) {
+              return { ok: response.ok, status: response.status, url: response.url || '', text: text };
+            });
+          }).then(function (result) {
+            window.clearTimeout(timeout);
+            var verdict = 'error';
+            var text = result.text || '';
+            var lower = text.toLowerCase();
+            var parsed = null;
+            try { parsed = JSON.parse(text); } catch (error) { parsed = null; }
+            if (/captcha|hcaptcha|turnstile|shopify-challenge|challenge-form/.test(lower)) {
+              verdict = 'challenge';
+            } else if (parsed && typeof parsed === 'object') {
+              var blob = JSON.stringify(parsed.errors || {}).toLowerCase();
+              if (parsed.errors && Object.keys(parsed.errors).length) {
+                if (/taken|zaten|bereits/.test(blob)) verdict = 'already';
+                else if (/invalid|geçersiz|ungültig/.test(blob)) verdict = 'invalid';
+                else verdict = 'error';
+              } else {
+                verdict = 'ok';
+              }
+            } else if ((result.url || '').indexOf('customer_posted=true') !== -1 || lower.indexOf('customer_posted=true') !== -1) {
+              verdict = 'ok';
+            } else if (text.length < 2500 && /already been taken|zaten alın/.test(lower)) {
+              verdict = 'already';
+            } else if (text.length < 2500 && /is invalid|geçersiz|ungültig/.test(lower)) {
+              verdict = 'invalid';
+            }
+            if (verdict === 'ok' || verdict === 'already') {
+              finish();
+              if (verdict === 'already') setMessage(t.already || '', 'note');
+              return;
+            }
+            sending = false;
+            render();
+            if (verdict === 'challenge') setMessage(t.challenge || '');
+            else if (verdict === 'invalid') setMessage(t.emailInvalid || '');
+            else setMessage(t.emailError || '');
+          }).catch(function () {
+            window.clearTimeout(timeout);
+            sending = false;
+            render();
+            setMessage(t.emailError || '');
+          });
+        }
+
+        function onNext() {
+          if (step === 'email') {
+            submitEmail();
+            return;
+          }
+          if (failed) {
+            index = 0;
+            failed = false;
+            step = 'question';
+            resetAnswers();
+            shuffleAll();
+            render();
+            return;
+          }
+          var question = questions[index];
+          var selected = question.querySelector('input:checked');
+          if (!selected) {
+            setMessage(t.choose || '');
+            return;
+          }
+          if (selected.value !== question.getAttribute('data-correct')) {
+            failed = true;
+            var label = selected.closest('.nw-quiz__opt');
+            if (label) label.classList.add('is-wrong');
+            render();
+            return;
+          }
+          if (index < questions.length - 1) {
+            index += 1;
+            render();
+            return;
+          }
+          if (root.dataset.email === 'true') {
+            step = 'email';
+            render();
+            emailInput.focus();
+            return;
+          }
+          finish();
+        }
+
+        function onBack() {
+          if (step === 'email') {
+            step = 'question';
+            index = questions.length - 1;
+            render();
+            return;
+          }
+          if (step === 'question' && index > 0 && !failed) {
+            index -= 1;
+            render();
+          }
+        }
+
+        function trap(event) {
+          var nodes = dialog.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+          var list = Array.prototype.filter.call(nodes, function (el) {
+            if (el.disabled || el.hidden) return false;
+            if (el.closest('[hidden]')) return false;
+            return el.getClientRects().length > 0;
+          });
+          if (!list.length) return;
+          var first = list[0];
+          var last = list[list.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+
+        launcher.addEventListener('click', function () {
+          window.clearTimeout(timer);
+          openQuiz();
+        });
+        closeBtn.addEventListener('click', closeQuiz);
+        nextBtn.addEventListener('click', onNext);
+        backBtn.addEventListener('click', onBack);
+        overlay.addEventListener('mousedown', function (event) {
+          if (event.target === overlay) closeQuiz();
+        });
+        emailInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submitEmail();
+          }
+        });
+        copyBtn.addEventListener('click', function () {
+          var code = root.dataset.code || '';
+          var done = function () { copyBtn.textContent = t.copied || t.copy || ''; };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code).then(done).catch(function () {
+              var area = document.createElement('textarea');
+              area.value = code;
+              area.setAttribute('readonly', '');
+              area.style.position = 'fixed';
+              area.style.left = '-999px';
+              document.body.appendChild(area);
+              area.select();
+              try { document.execCommand('copy'); done(); } catch (error) {}
+              area.remove();
+            });
+            return;
+          }
+          var area = document.createElement('textarea');
+          area.value = code;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.left = '-999px';
+          document.body.appendChild(area);
+          area.select();
+          try { document.execCommand('copy'); done(); } catch (error) {}
+          area.remove();
+        });
+        document.addEventListener('keydown', function (event) {
+          if (overlay.hidden) return;
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeQuiz();
+          } else if (event.key === 'Tab') {
+            trap(event);
+          }
+        });
+
+        document.addEventListener('shopify:section:select', function (event) {
+          if (!event.detail || event.detail.sectionId !== sectionId) return;
+          openQuiz();
+        });
+        document.addEventListener('shopify:block:select', function (event) {
+          if (!event.detail || event.detail.sectionId !== sectionId) return;
+          var node = root.querySelector('[data-block-id="' + event.detail.blockId + '"]');
+          var at = questions.indexOf(node);
+          if (at < 0) return;
+          openQuiz();
+          index = at;
+          failed = false;
+          step = 'question';
+          render();
+        });
+        document.addEventListener('shopify:section:unload', function (event) {
+          if (!event.detail || event.detail.sectionId !== sectionId) return;
+          unlockScroll();
+          if (root.isConnected) root.remove();
+        });
+
+        if (design) {
+          openQuiz();
+          return;
+        }
+
+        if (root.dataset.auto !== 'true' || wonAt()) return;
+        var frequency = root.dataset.frequency || 'session';
+        if (frequency === 'once' && readStore('localStorage', dismissKey)) return;
+        if (frequency === 'session' && readStore('sessionStorage', dismissKey)) return;
+        var wait = Math.max(0, Number(root.dataset.delay || 0)) * 1000;
+        timer = window.setTimeout(openQuiz, wait);
+      })();
+    </script>
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Quiz popup",
+  "tag": "section",
+  "class": "nw-quiz-section",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Soru bloğu yoksa ziyaretçinin diline göre 3 örnek soru çalışır. Bir soru eklediğinizde örnekler kalkar. İndirim kodunu Shopify yönetiminde İndirimler bölümünden de oluşturun; buradaki kodla aynı olsun. Liquid dosyasında duran kod, sayfa kaynağında görülebilir."
+    },
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Quiz açık",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "discount_code",
+      "label": "İndirim kodu",
+      "default": "HOSGELDIN"
+    },
+    {
+      "type": "url",
+      "id": "redirect",
+      "label": "Kod uygulandıktan sonra gidilecek sayfa",
+      "info": "Boşsa tüm ürünler koleksiyonuna gider."
+    },
+    {
+      "type": "checkbox",
+      "id": "require_email",
+      "label": "Koddan önce e-posta iste",
+      "info": "Adres, Shopify müşteri listesine kaydedilir. Kendi sunucunuz yoktur.",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "customer_tag",
+      "label": "Müşteri etiketi",
+      "default": "quiz"
+    },
+    {
+      "type": "range",
+      "id": "code_days",
+      "min": 1,
+      "max": 30,
+      "step": 1,
+      "unit": "gün",
+      "label": "Kod ekranına erişim",
+      "default": 7
+    },
+    {
+      "type": "checkbox",
+      "id": "auto_open",
+      "label": "Kendiliğinden aç",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "delay",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "sn",
+      "label": "Açılış gecikmesi",
+      "default": 5
+    },
+    {
+      "type": "select",
+      "id": "frequency",
+      "label": "Kapatınca yeniden açılma",
+      "options": [
+        { "value": "once", "label": "Bir daha kendiliğinden açılmasın" },
+        { "value": "session", "label": "Bu oturumda bir kez" },
+        { "value": "always", "label": "Her sayfada, kod alınana kadar" }
+      ],
+      "default": "session"
+    },
+    {
+      "type": "checkbox",
+      "id": "shuffle",
+      "label": "Cevapları karıştır",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "launcher",
+      "label": "QUIZ sekmesi",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "tab_label",
+      "label": "Sekme yazısı",
+      "default": "QUIZ"
+    },
+    {
+      "type": "select",
+      "id": "launcher_side",
+      "label": "Sekme konumu",
+      "options": [
+        { "value": "left", "label": "Sol" },
+        { "value": "right", "label": "Sağ" }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "header",
+      "content": "Metin"
+    },
+    {
+      "type": "text",
+      "id": "kicker",
+      "label": "Başlık",
+      "info": "Boşsa Türkçe, İngilizce ve Almanca otomatik gelir."
+    },
+    {
+      "type": "textarea",
+      "id": "email_hint",
+      "label": "E-posta açıklaması",
+      "info": "Boşsa dile göre otomatik gelir. Doluysa tüm dillerde bu metin kullanılır; çeviri için Shopify Translate kullanın."
+    },
+    {
+      "type": "textarea",
+      "id": "success_text",
+      "label": "Kod ekranı metni",
+      "info": "Boşsa dile göre otomatik gelir."
+    },
+    {
+      "type": "header",
+      "content": "Görünüm"
+    },
+    {
+      "type": "color",
+      "id": "accent",
+      "label": "Vurgu rengi",
+      "default": "#111111"
+    },
+    {
+      "type": "color",
+      "id": "accent_text",
+      "label": "Vurgu üstü yazı",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "background",
+      "label": "Kart zemini",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "text",
+      "label": "Yazı rengi",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "min": 0,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "label": "Köşe yuvarlaklığı",
+      "default": 18
+    }
+  ],
+  "blocks": [
+    {
+      "type": "question",
+      "name": "Soru",
+      "settings": [
+        {
+          "type": "select",
+          "id": "locale",
+          "label": "Dil",
+          "info": "Tüm diller, her ziyaretçiye aynı soruyu gösterir. İngilizce soru için ayrı blok ekleyip English seçin.",
+          "options": [
+            { "value": "all", "label": "Tüm diller" },
+            { "value": "tr", "label": "Türkçe" },
+            { "value": "en", "label": "English" },
+            { "value": "de", "label": "Deutsch" }
+          ],
+          "default": "all"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Soru"
+        },
+        {
+          "type": "text",
+          "id": "option_1",
+          "label": "Seçenek 1"
+        },
+        {
+          "type": "text",
+          "id": "option_2",
+          "label": "Seçenek 2"
+        },
+        {
+          "type": "text",
+          "id": "option_3",
+          "label": "Seçenek 3"
+        },
+        {
+          "type": "text",
+          "id": "option_4",
+          "label": "Seçenek 4",
+          "info": "Boş bırakılırsa gösterilmez."
+        },
+        {
+          "type": "select",
+          "id": "correct",
+          "label": "Doğru seçenek",
+          "options": [
+            { "value": "1", "label": "1" },
+            { "value": "2", "label": "2" },
+            { "value": "3", "label": "3" },
+            { "value": "4", "label": "4" }
+          ],
+          "default": "1"
+        }
+      ]
+    }
+  ],
+  "max_blocks": 50,
+  "presets": [
+    {
+      "name": "Quiz popup",
+      "blocks": [
+        {
+          "type": "question",
+          "settings": {
+            "locale": "all",
+            "title": "İndirim kodunu alışverişe nerede eklersiniz?",
+            "option_1": "Ürün görsellerinin altında",
+            "option_2": "Sepetteki kod alanına veya ödeme sayfasına",
+            "option_3": "Site aramasına",
+            "option_4": "Yalnızca kasa fişinde",
+            "correct": "2"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "locale": "all",
+            "title": "Kodun işe yaraması için hangisi gerekir?",
+            "option_1": "Kodun Shopify yönetiminde oluşturulmuş bir indirim olması",
+            "option_2": "Sepetin boş olması",
+            "option_3": "Ürün adının kodla aynı olması",
+            "option_4": "Kodun yalnızca rakamlardan oluşması",
+            "correct": "1"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "locale": "all",
+            "title": "Quiz bitince indirim kodu nerede görünür?",
+            "option_1": "Yalnızca e-posta kutusunda",
+            "option_2": "Aynı pencerede",
+            "option_3": "Yalnızca kargo mesajında",
+            "option_4": "Ürün yorumlarının içinde",
+            "correct": "2"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
